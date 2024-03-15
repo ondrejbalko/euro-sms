@@ -1,5 +1,7 @@
 # EuroSMS
 
+[EuroSMS](https://www.eurosms.com/) is an SMS gateway operating in Slovakia. The library uses REST api v3 for communication.
+
 ## Examples
 
 ### Send one
