@@ -69,8 +69,6 @@ class EuroSmsService
      */
     private function doRequest(string $endpoint, RequestInterface $request): ResponseInterface
     {
-        dump(json_encode($request));
-
         try {
             return $this->client->post($this->getEndpoint($endpoint), [
                 RequestOptions::JSON => $request,
