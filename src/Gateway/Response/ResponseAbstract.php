@@ -6,7 +6,7 @@ use EuroSms\Gateway\GatewayInterface;
 
 abstract class ResponseAbstract
 {
-    /** @var array<string, mixed> $body */
+    /** @var array<mixed, mixed> $body */
     protected array $body;
 
     /** @var array<string, string> $errors */
