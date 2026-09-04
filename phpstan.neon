@@ -1,4 +1,5 @@
 parameters:
-    level: 9
+    level: 10
+    phpVersion: 80500
     paths:
       - src

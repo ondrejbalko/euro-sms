@@ -1,13 +1,22 @@
 <?php
 
+declare(strict_types=1);
+
 namespace EuroSms\Gateway\Response;
+
+use EuroSms\Enums\SendStatusEnum;
 
 interface ResponseInterface
 {
     /**
-     * @return array<string, array<int, string>>
+     * @return array<string, mixed>
      */
     public function getBody(): array;
+
+    /**
+     * @return array<string, string>
+     */
+    public function getErrors(): array;
 
     /**
      * @return int|null
@@ -18,6 +27,11 @@ interface ResponseInterface
      * @return string
      */
     public function getRequestId(): string;
+
+    /**
+     * @return SendStatusEnum|null
+     */
+    public function getSendStatus(): ?SendStatusEnum;
 
     /**
      * @return bool

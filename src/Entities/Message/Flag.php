@@ -1,11 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace EuroSms\Entities\Message;
+
+use EuroSms\Enums\FlagEnum;
 
 class Flag
 {
     /**
-     * @var int[]
+     * @var FlagEnum[]
      */
     private array $flags = [];
 
@@ -14,7 +18,7 @@ class Flag
      */
     public function addDefault(): void
     {
-        $this->flags[] = MessageInterface::FLAG_DEFAULT;
+        $this->flags[] = FlagEnum::DEFAULT;
     }
 
     /**
@@ -22,7 +26,7 @@ class Flag
      */
     public function addLong(): void
     {
-        $this->flags[] = MessageInterface::FLAG_LONG;
+        $this->flags[] = FlagEnum::LONG;
     }
 
     /**
@@ -30,7 +34,7 @@ class Flag
      */
     public function addPriorityHigh(): void
     {
-        $this->flags[] = MessageInterface::FLAG_HIGH_PRIORITY;
+        $this->flags[] = FlagEnum::HIGH_PRIORITY;
     }
 
     /**
@@ -38,7 +42,7 @@ class Flag
      */
     public function addPriorityLow(): void
     {
-        $this->flags[] = MessageInterface::FLAG_LOW_PRIORITY;
+        $this->flags[] = FlagEnum::LOW_PRIORITY;
     }
 
     /**
@@ -46,15 +50,18 @@ class Flag
      */
     public function addReceipt(): void
     {
-        $this->flags[] = MessageInterface::FLAG_RECEIPT;
+        $this->flags[] = FlagEnum::RECEIPT;
     }
 
     /**
+     * A long message with diacritics carries both the long flag and the diacritics flag,
+     * there is no separate flag for the two of them together.
      * @return void
      */
     public function addUnicodeLong(): void
     {
-        $this->flags[] = MessageInterface::FLAG_UNICODE_LONG;
+        $this->addLong();
+        $this->addUnicodeShort();
     }
 
     /**
@@ -62,7 +69,7 @@ class Flag
      */
     public function addUnicodeShort(): void
     {
-        $this->flags[] = MessageInterface::FLAG_UNICODE_SHORT;
+        $this->flags[] = FlagEnum::UNICODE_SHORT;
     }
 
     /**
@@ -70,7 +77,7 @@ class Flag
      */
     public function addViber(): void
     {
-        $this->flags[] = MessageInterface::FLAG_VIBER;
+        $this->flags[] = FlagEnum::VIBER;
     }
 
     /**
@@ -78,65 +85,123 @@ class Flag
      */
     public function addViberOnly(): void
     {
-        $this->flags[] = MessageInterface::FLAG_VIBER;
-        $this->flags[] = MessageInterface::FLAG_VIBER_ONLY;
+        $this->flags[] = FlagEnum::VIBER;
+        $this->flags[] = FlagEnum::VIBER_ONLY;
     }
 
     /**
+     * The promo flag is only valid together with Viber itself.
      * @return void
      */
     public function addViberPromo(): void
     {
-        $this->flags[] = MessageInterface::FLAG_VIBER_PROMO;
+        $this->flags[] = FlagEnum::VIBER;
+        $this->flags[] = FlagEnum::VIBER_PROMO;
     }
 
     /**
-     * @return int[]
+     * Every flag the gateway knows, chapter 14.1 — not the flags of this one message, which is
+     * what getFlags() answers. It asks nothing of the object and is static for that reason: read
+     * as an instance method it named the object it was called on and handed back something else
+     * entirely, so `in_array($case, $flag->all(), true)` was a question about this message that
+     * came back true for every case there is.
+     * @return FlagEnum[]
      */
-    public function all(): array
+    #[\NoDiscard('the list of known flags is all this call produces')]
+    public static function all(): array
     {
-        return [
-            MessageInterface::FLAG_DEFAULT,
-            MessageInterface::FLAG_RECEIPT,
-            MessageInterface::FLAG_LONG,
-            MessageInterface::FLAG_UNICODE_SHORT,
-            MessageInterface::FLAG_UNICODE_LONG,
-            MessageInterface::FLAG_HIGH_PRIORITY,
-            MessageInterface::FLAG_LOW_PRIORITY,
-            MessageInterface::FLAG_VIBER_ONLY,
-            MessageInterface::FLAG_VIBER_PROMO,
-            MessageInterface::FLAG_VIBER
-        ];
+        return FlagEnum::cases();
     }
 
     /**
+     * Flags are single bits of one value, so they are combined bitwise. Adding them up would
+     * turn on bits the caller never asked for.
      * @return int
      */
+    #[\NoDiscard('the composed flgs value is all this call produces')]
     public function getValue(): int
     {
-        return array_sum($this->getFlags());
+        $value = FlagEnum::DEFAULT->value;
+
+        foreach ($this->getFlags() as $flag) {
+            $value |= $flag->value;
+        }
+
+        return $value;
     }
 
     /**
-     * @return int[]
+     * The flags this message goes out under, each of them once, and the plain default when none
+     * were set at all.
+     *
+     * Reading them leaves the message alone. Answering the question used to write the answer back:
+     * a flag set that had been asked what it holds no longer held nothing, so "was anything set?"
+     * could not be asked afterwards, and a Flag cloned into a request differed depending on
+     * whether anybody had read it first.
+     * @return FlagEnum[]
      */
+    #[\NoDiscard('the flags of this message are all this call produces')]
     public function getFlags(): array
     {
         if ([] === $this->flags) {
-            $this->addDefault();
+            return [FlagEnum::DEFAULT];
         }
 
-        $this->flags = array_unique($this->flags);
-
-        return $this->flags;
+        return array_unique($this->flags, SORT_REGULAR) |> array_values(...);
     }
 
     /**
-     * @param int[] $flags
+     * The flags a composed value stands for, chapter 14.1. The value is not looked up whole: the
+     * chapter lists single bits and every other number it prints is those bits combined, so six
+     * is the long flag together with the diacritics flag and not a flag of its own. A bit the
+     * gateway knows no flag for is dropped, the same way anything else that is not a flag is.
+     * @param int $value
+     * @return FlagEnum[]
+     */
+    private static function getCases(int $value): array
+    {
+        if (0 >= $value) {
+            return [];
+        }
+
+        $cases = [];
+
+        foreach (FlagEnum::cases() as $case) {
+            if (FlagEnum::DEFAULT !== $case && $case->value === ($value & $case->value)) {
+                $cases[] = $case;
+            }
+        }
+
+        return $cases;
+    }
+
+    /**
+     * Only what the gateway knows as a flag is kept, anything else is dropped rather than left
+     * to blow up when the value is composed. A plain integer is accepted as well, so that the
+     * numbers of chapter 14.1 can be handed over as they are read there — one that is several
+     * flags at once is taken apart into the flags it is composed of. Nothing enforces that
+     * promise, so whatever else arrives is dropped as well.
+     * @param mixed[] $flags
      * @return void
      */
     public function setFlags(array $flags): void
     {
-        $this->flags = array_intersect($flags, $this->all());
+        $known = [];
+
+        foreach ($flags as $flag) {
+            if ($flag instanceof FlagEnum) {
+                $known[] = $flag;
+
+                continue;
+            }
+
+            if (is_int($flag)) {
+                foreach (self::getCases($flag) as $case) {
+                    $known[] = $case;
+                }
+            }
+        }
+
+        $this->flags = $known;
     }
 }

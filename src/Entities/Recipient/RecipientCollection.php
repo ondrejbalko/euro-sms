@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace EuroSms\Entities\Recipient;
 
 use EuroSms\Entities\CollectionAbstract;

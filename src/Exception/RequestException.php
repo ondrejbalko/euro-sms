@@ -1,10 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
 namespace EuroSms\Exception;
 
-use Exception;
-use Throwable;
-
-class RequestException extends Exception implements Throwable
+class RequestException extends EuroSmsException
 {
 }

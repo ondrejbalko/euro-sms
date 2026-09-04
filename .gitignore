@@ -1,4 +1,6 @@
 /.idea
+/build
+/cache
 /example
 /vendor
 /composer.lock
