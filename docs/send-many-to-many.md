@@ -156,8 +156,10 @@ collection leave at once.
 ## Defaults of the transaction
 
 The root of a transaction states what its messages fall back to, chapter 9.3.8: `dsndr` the sender
-name, `dflgs` the flags, `dimsndr` and `dimttl` the Viber sender and its time to live. **Each of
-them is taken from the first message of the collection that names any.** A message that asks for
+name, `dflgs` the flags. **Each of them is taken from the first message of the collection that
+names any.** The Viber sender and time to live are taken the same way, but the root cannot carry
+them — the gateway answers `dimsndr` and `dimttl` with `WRONG_KEY` — so they are written into the
+`im` of every entry instead, see [Viber](viber.md#in-a-transaction). A message that asks for
 nothing of its own repeats neither, and it is signed with the name the gateway will send it under.
 
 ```php
@@ -168,8 +170,14 @@ $second->setSenderName('MyShop2'); // states its own sndr, so it overrides the d
 ## How big a transaction is
 
 A transaction holds a thousand messages, `GatewayInterface::MAX_ITEMS_PER_REQUEST`, and what counts
-towards that is **how many messages it sends, not how many entries it lists** — one entry addressed
-to a thousand numbers is already a thousand messages.
+towards that is **how many messages it sends, not how many messages were handed over** — one
+message addressed to a thousand numbers is already a thousand messages.
+
+**Every entry of a transaction is addressed to exactly one number.** A message handed over with a
+collection of recipients is written out as one entry per number, each carrying the same text and
+signed over its own number, chapter 9.2.2; the key of a recipient travels as `f` beside the `rcpt`
+of its entry. The gateway answers a list inside an entry with `NO_RCPT` — in an answer whose code
+still reads `ENQUEUED` — so a list is never sent.
 
 A collection carrying more is split into several transactions and every message is still sent: a
 send of more than a thousand messages is allowed, it merely does not fit into one request. The
@@ -209,6 +217,6 @@ error the answer carried.
 ## What goes on from here
 
 * [The message](message.md) — the flags and the defaults each message can name
-* [Viber](viber.md) — `dimsndr` and `dimttl`, the Viber defaults of a transaction
+* [Viber](viber.md) — the Viber defaults of a transaction and how a Viber message is signed
 * [Delivery status](delivery-status.md) — asking after a group afterwards
 * [Errors](errors.md) — every exception above, with its codes

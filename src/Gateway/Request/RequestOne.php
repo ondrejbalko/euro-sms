@@ -26,14 +26,12 @@ class RequestOne extends RequestMessageAbstract implements RequestRecipientInter
 
     /**
      * The body of a single message, chapters 9.2.1 and 9.3.1 of SMS API v3.1.15. A field that
-     * carries nothing is left out rather than sent empty, so every one of them but the response
-     * mode is only there when the request was given it:
+     * carries nothing is left out rather than sent empty, so every one of them is only there when
+     * the request was given it:
      *
      * - iid: the integration id the request is sent under
-     * - rsp: how much of an answer is asked for, the one the configuration states
      * - sgn: the signature over the sender, the recipient and the text, chapter 9.2.2
-     * - rcpt: the number the message is addressed to, or the object of chapter 9.2 when the
-     *   recipient carries a key of its own
+     * - rcpt: the number the message is addressed to, always the bare number
      * - flgs: the composed flags value, gone when it is the plain default of zero
      * - ttl: how long the message may wait for its recipient, in seconds
      * - sndr: the sender name the message goes out under
@@ -41,7 +39,11 @@ class RequestOne extends RequestMessageAbstract implements RequestRecipientInter
      * - txt: the text of the message
      * - im: the Viber variant, only when the message carries one, chapter 10.2.1
      *
-     * @return array{iid?: string, rsp: string, sgn?: string, rcpt?: int|array{r: int, f: string}, flgs?: int, ttl?: int, sndr?: string, sch?: string, txt?: string, im?: array{sndr?: string, ttl?: int, msg?: string}}
+     * The endpoint knows neither "rsp" nor a recipient key: it answers the first with WRONG_KEY and
+     * "rcpt" given as the object of chapter 9.2 with WRONG_NUMBER, so the one is never written and
+     * a recipient carrying the other is refused before anything is sent.
+     *
+     * @return array{iid?: string, sgn?: string, rcpt?: int, flgs?: int, ttl?: int, sndr?: string, sch?: string, txt?: string, im?: array{sndr?: string, ttl?: int, msg?: string}}
      * @throws MessageException
      * @throws RecipientException
      * @throws RequestException
@@ -57,6 +59,13 @@ class RequestOne extends RequestMessageAbstract implements RequestRecipientInter
             throw new MessageException('Sender name not defined', MessageInterface::ERROR_SENDER_NOT_DEFINED);
         }
 
+        if ($this->recipient->hasIdentifier()) {
+            throw new RequestException(
+                'A single message cannot carry a key of its recipient, send it one to many instead.',
+                RequestInterface::ERROR_RECIPIENT_KEY_NOT_SUPPORTED
+            );
+        }
+
         $this->sign();
 
         $flags = $this->flag->getValue();
@@ -69,9 +78,8 @@ class RequestOne extends RequestMessageAbstract implements RequestRecipientInter
          */
         return array_filter([
             FieldEnum::CLIENT_ID->value => $this->clientId,
-            FieldEnum::RESPONSE->value => $this->getResponseFormat()->value,
             FieldEnum::SIGN->value => $this->sign,
-            FieldEnum::RECIPIENT->value => self::getRecipientValue($this->recipient),
+            FieldEnum::RECIPIENT->value => $this->recipient->getNumberClean(),
             FieldEnum::FLAGS->value => FlagEnum::DEFAULT->value === $flags ? null : $flags,
             FieldEnum::TTL->value => $this->ttl ?? null,
             FieldEnum::SENDER_NAME->value => $this->senderName,
@@ -98,14 +106,26 @@ class RequestOne extends RequestMessageAbstract implements RequestRecipientInter
     }
 
     /**
-     * The one number the message is addressed to, chapter 9.3.1, written under "rcpt".
-     * @return array{rcpt: int|array{r: int, f: string}}
+     * The one number the message is addressed to, chapter 9.3.1, written under "rcpt". A message
+     * of a transaction names the key of its recipient beside it, under "f"; the transaction writes
+     * that out itself, because the endpoint of a single message refuses it.
+     * @return array{rcpt: int}
      * @throws RecipientException
      */
     #[\Override]
     public function getRecipientData(): array
     {
-        return [FieldEnum::RECIPIENT->value => self::getRecipientValue($this->getRecipient())];
+        return [FieldEnum::RECIPIENT->value => $this->getRecipient()->getNumberClean()];
+    }
+
+    /**
+     * @return list<Recipient>
+     * @throws RecipientException when the request was never given its recipient
+     */
+    #[\Override]
+    public function getRecipientList(): array
+    {
+        return [$this->getRecipient()];
     }
 
     /**

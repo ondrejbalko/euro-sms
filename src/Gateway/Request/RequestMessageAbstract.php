@@ -10,7 +10,9 @@ use EuroSms\Entities\Message\InstantMessage;
 use EuroSms\Entities\Message\MessageInterface;
 use EuroSms\Entities\Recipient\Recipient;
 use EuroSms\Enums\FieldEnum;
+use EuroSms\Enums\FlagEnum;
 use EuroSms\Exception\MessageException;
+use EuroSms\Exception\RecipientException;
 use EuroSms\Exception\RequestException;
 use EuroSms\Gateway\GatewayInterface;
 use EuroSms\Helpers\Encoder;
@@ -114,18 +116,31 @@ abstract class RequestMessageAbstract extends RequestAbstract
 
     /**
      * How the message names who it is addressed to, chapters 9.3.1 and 9.3.3: one number under
-     * "rcpt", a whole list of them under "rcpts". A message of a group transaction is written out
-     * of this rather than read back out of the body of a request that is not its own.
-     * @return array{rcpt: int|array{r: int, f: string}}|array{rcpts: list<int|array{r: int, f: string}>}
+     * "rcpt", a whole list of them under "rcpts".
+     * @return array{rcpt: int}|array{rcpts: list<int|array{r: int, f: string}>}
      */
     abstract public function getRecipientData(): array;
 
     /**
-     * How one recipient is written into a request. A recipient that carries no key of its own is
-     * the bare number it always was; one that does becomes the object of chapter 9.2, pairing the
-     * number under "r" with the key under "f". The gateway hands that key back on the delivery
-     * report, chapter 9.4.2, which is the only way a receipt can be told from another one sent to
-     * the same number. Both shapes may stand side by side in one list of recipients.
+     * The recipients themselves, keys and all, in the order they were handed over. A transaction
+     * writes every one of them out as a message of its own, chapter 9.3.8, and needs the key each
+     * of them carries for that.
+     * @return list<Recipient>
+     * @throws RecipientException when the request was never given any
+     */
+    abstract public function getRecipientList(): array;
+
+    /**
+     * How one recipient is written into the list of a one-to-many request, chapter 9.3.3. A
+     * recipient that carries no key of its own is the bare number it always was; one that does
+     * becomes the object of chapter 9.2, pairing the number under "r" with the key under "f". The
+     * gateway hands that key back on the delivery report, chapter 9.4.2, which is the only way a
+     * receipt can be told from another one sent to the same number. Both shapes may stand side by
+     * side in one list of recipients.
+     *
+     * Only that list takes the object. The endpoint of a single message answers it with
+     * WRONG_NUMBER, and a message of a transaction answers it with ERR_OTHER and names the key
+     * beside its "rcpt" instead.
      * @param Recipient $recipient
      * @return int|array{r: int, f: string}
      */
@@ -151,6 +166,32 @@ abstract class RequestMessageAbstract extends RequestAbstract
      * @return list<int>
      */
     abstract public function getRecipients(): array;
+
+    /**
+     * The text the signature of chapter 9.2.2 closes with. A message asking to go out over Viber
+     * signs the text of its Viber variant right after its own: the gateway answers a signature
+     * without it with WRONG_SIGNATURE. A variant that no flag asks for is signed without it, the
+     * way the gateway checks it — attached and never asked for, it is no part of the message.
+     * @return string
+     * @throws RequestException when the message was never given a text
+     */
+    public function getSignedText(): string
+    {
+        $content = $this->getContent();
+        $viberText = isset($this->instantMessage) ? $this->instantMessage->getContent() : null;
+
+        if (null === $viberText) {
+            return $content;
+        }
+
+        $flags = $this->flag->getFlags();
+
+        if (!in_array(FlagEnum::VIBER, $flags, true) && !in_array(FlagEnum::VIBER_ONLY, $flags, true)) {
+            return $content;
+        }
+
+        return $content . $viberText;
+    }
 
     /**
      * @return DateTime
@@ -298,15 +339,13 @@ abstract class RequestMessageAbstract extends RequestAbstract
 
     /**
      * The signature of chapter 9.2.2: the sender name, every number the message is addressed to
-     * written one after another, and the text, hashed with the integration key. A message
+     * written one after another, and the text — followed by the Viber text when the message asks
+     * for Viber, see getSignedText() — hashed with the integration key. A message
      * addressed to one number and one addressed to a list sign the same string — the list of one
      * is that one number — so both are signed here.
      *
-     * It is worked out on its own rather than as a by-product of building the body. A transaction
-     * needs nothing of its messages but their signatures, chapter 9.3.8, and it used to get them
-     * by building each message's whole request and throwing it away: for a transaction of a
-     * thousand entries, a thousand bodies composed, filtered and dropped, with the recipients then
-     * written out a second time for the entry that is kept.
+     * A transaction does not use this one: every entry of it is addressed to a single number,
+     * chapter 9.3.8, so it signs each recipient of a message on its own.
      * @return string
      * @throws MessageException when the message was never given a sender to go out under
      * @throws RequestException when the message was never given a text
@@ -320,7 +359,7 @@ abstract class RequestMessageAbstract extends RequestAbstract
         $this->sign = $this->calcSignature(
             $this->senderName,
             implode('', $this->getRecipients()),
-            $this->getContent()
+            $this->getSignedText()
         );
 
         return $this->sign;

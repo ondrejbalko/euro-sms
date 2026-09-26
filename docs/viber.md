@@ -100,12 +100,25 @@ ever reports. See [Delivery status](delivery-status.md) and [CallBack](callback.
 
 ## In a transaction
 
-A group send falls back to the `dimsndr` and `dimttl` of the whole transaction, chapter 9.3.8,
-taken from the first message that names a variant. A message only has to name what differs.
+The Viber sender and time to live of the first message that names a variant become the defaults
+of the transaction, and a message only has to name what differs. The root of a transaction cannot
+carry them — the gateway answers `dimsndr` and `dimttl` with `WRONG_KEY` — so the library writes
+them into the `im` of every entry that names neither.
 
 ```php
-$first->setInstantMessage($variant);  // becomes dimsndr and dimttl for the transaction
+$first->setInstantMessage($variant);  // its sender and time to live complete every other variant
 ```
+
+## The signature
+
+A message asking for Viber — `addViber()` or `addViberOnly()` — is signed over the text of its
+variant too, written right after its own text; the gateway answers a signature without it with
+`WRONG_SIGNATURE`. A variant no flag asks for is left out of the signature. The library composes
+it either way, `RequestMessageAbstract::getSignedText()` shows what went into it.
+
+**`addViberOnly()` needs a registered Viber sender even in test mode.** Where none is registered,
+the gateway answers it with `WRONG_SENDER` whatever `sndr` and `im.sndr` say, while the same message
+with `addViber()` is accepted and falls back to SMS.
 
 ## Registering the sender
 

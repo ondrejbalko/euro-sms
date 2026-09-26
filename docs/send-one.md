@@ -50,8 +50,7 @@ $config->setTestMode(true);
 try {
     $service = new EuroSmsService($config);
 
-    $recipient = new Recipient('0901 000 000');
-    $recipient->setIdentifier('order-4471'); // repeated back on every delivery report
+    $recipient = new Recipient('0901 000 000'); // a key of its own is refused here, see recipients.md
 
     $message = new Message;
     $message->setDateTimeZone(new DateTimeZone('Europe/Bratislava'));
@@ -88,7 +87,7 @@ try {
 } catch (MessageException $e) {
     // the sender name or the text was refused, see docs/errors.md for the code
 } catch (RequestException $e) {
-    // the request could not be built out of the message
+    // the request could not be built out of the message, or its recipient carries a key
 } catch (SendException $e) {
     // the call did not go through at all
     $e->getHttpStatus();   // 500, or null when the gateway was never reached
@@ -153,8 +152,8 @@ foreach ($responses->all() as $requestId => $response) {
 }
 ```
 
-`$config->setResponseFormat(ResponseFormatEnum::FULL)` decides how much the gateway writes back
-here — see [Configuration](configuration.md).
+A single message asks for no particular answer: its endpoint refuses the `rsp` parameter, see
+[Configuration](configuration.md).
 
 ## What goes on from here
 

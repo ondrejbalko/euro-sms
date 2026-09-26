@@ -49,8 +49,8 @@ final class InstantMessageTest extends TestCase
     }
 
     /**
-     * What the object does not carry falls back to the "dimsndr" and "dimttl" defaults of the
-     * transaction, so a variant that only differs in its text writes out nothing else.
+     * What the object does not carry is completed from the Viber defaults of the transaction, so a
+     * variant that only differs in its text writes out nothing else.
      */
     public function testWhatWasNeverSetIsLeftOutOfTheObject(): void
     {

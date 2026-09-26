@@ -203,7 +203,9 @@ class Config
 
     /**
      * A send whose result is read number by number asks for the full answer no matter what is
-     * set here, chapter 9.3.11, so this decides the rest.
+     * set here, chapter 9.3.11, and the endpoint of a single message refuses "rsp" altogether
+     * with WRONG_KEY, so nothing any send writes is decided by this any more.
+     * @deprecated since 2.0.1, it has no effect on any request
      * @param ResponseFormatEnum $responseFormat
      * @return void
      */

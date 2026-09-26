@@ -79,13 +79,14 @@ the length of chapter 9.4.3 instead and raises a `RequestException`.
 
 ### `RequestInterface`
 
-| Constant                        | What was written                                                    |
-|---------------------------------|---------------------------------------------------------------------|
-| `ERROR_MESSAGE_NOT_DEFINED`     | a request built without a text                                      |
-| `ERROR_DURATION_INVALID`        | a duration not written as `hh:mm`                                   |
-| `ERROR_MESSAGE_NOT_SCHEDULABLE` | a message of a transaction given a schedule, an end or a time to live |
-| `ERROR_DURATION_AMBIGUOUS`      | two messages of one transaction asking for different durations      |
-| `ERROR_DURATION_NOT_SPLITTABLE` | a collection asking for a duration and too big for one transaction  |
+| Constant                            | What was written                                                      |
+|-------------------------------------|-----------------------------------------------------------------------|
+| `ERROR_MESSAGE_NOT_DEFINED`         | a request built without a text                                        |
+| `ERROR_DURATION_INVALID`            | a duration not written as `hh:mm`                                     |
+| `ERROR_MESSAGE_NOT_SCHEDULABLE`     | a message of a transaction given a schedule, an end or a time to live |
+| `ERROR_DURATION_AMBIGUOUS`          | two messages of one transaction asking for different durations        |
+| `ERROR_DURATION_NOT_SPLITTABLE`     | a collection asking for a duration and too big for one transaction    |
+| `ERROR_RECIPIENT_KEY_NOT_SUPPORTED` | a single message addressed to a recipient carrying a key              |
 
 ### `CallBackParser` and `Acknowledgement`
 

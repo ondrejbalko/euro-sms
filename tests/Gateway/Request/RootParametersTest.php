@@ -43,20 +43,16 @@ final class RootParametersTest extends TestCase
     private const string TEXT = 'Testovacia sprava';
 
     /**
-     * The gateway itself falls back to the basic answer, chapter 9.2.1, so that is what a single
-     * message asks for until the caller asks for more.
+     * The endpoint of a single message answers "rsp" with WRONG_KEY, whatever value it carries,
+     * so a single message asks for nothing, whichever answer is configured.
      */
-    public function testASingleMessageAsksForTheConfiguredAnswer(): void
-    {
-        self::assertSame(ResponseFormatEnum::BASIC->value, $this->requestOne()->getData()['rsp']);
-    }
-
-    public function testTheConfiguredAnswerReachesTheBodyOfASingleMessage(): void
+    public function testASingleMessageAsksForNoAnswerFormat(): void
     {
         $config = $this->config();
         $config->setResponseFormat(ResponseFormatEnum::FULL);
 
-        self::assertSame(ResponseFormatEnum::FULL->value, $this->requestOne($config)->getData()['rsp']);
+        self::assertArrayNotHasKey('rsp', $this->requestOne()->getData());
+        self::assertArrayNotHasKey('rsp', $this->requestOne($config)->getData());
     }
 
     /**

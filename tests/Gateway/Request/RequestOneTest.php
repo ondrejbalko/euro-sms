@@ -11,6 +11,7 @@ use EuroSms\Entities\Message\Flag;
 use EuroSms\Entities\Message\InstantMessage;
 use EuroSms\Entities\Recipient\Recipient;
 use EuroSms\Entities\Recipient\RecipientInterface;
+use EuroSms\Enums\ResponseFormatEnum;
 use EuroSms\Exception\ConfigException;
 use EuroSms\Exception\InstantMessageException;
 use EuroSms\Exception\MessageException;
@@ -20,6 +21,7 @@ use EuroSms\Gateway\GatewayInterface;
 use EuroSms\Gateway\Request\RequestInterface;
 use EuroSms\Gateway\Request\RequestOne;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -38,6 +40,7 @@ final class RequestOneTest extends TestCase
     private const string TEXT = 'Testovacia sprava';
     private const string UNICODE_TEXT = 'Ďakujeme za objednávku, tovar posielame ešte dnes a doručenie čakajte do dvoch dní.';
     private const string SIGNATURE = '6f56060b6b7db97ca25782b771cca0a65077bd5b';
+    private const string VIBER_SIGNATURE = '1728d6e1034dbdac7c7ea87eb39b37538e1f6b22';
     private const string VIBER_SENDER = 'RZi Viber';
     private const string VIBER_TEXT = 'Ďakujeme za objednávku, tovar posielame ešte dnes.';
 
@@ -49,7 +52,6 @@ final class RequestOneTest extends TestCase
 
         self::assertSame([
             'iid' => self::INTEGRATION_ID,
-            'rsp' => 'basic',
             'sgn' => self::SIGNATURE,
             'rcpt' => 421903622237,
             'flgs' => 1,
@@ -89,22 +91,50 @@ final class RequestOneTest extends TestCase
     }
 
     /**
-     * Chapter 9.2: a recipient the calling system knows by a key of its own is named as an object
-     * pairing the number under "r" with that key under "f", instead of as the bare number.
+     * The endpoint of a single message answers "rsp" with WRONG_KEY, whatever value it carries,
+     * so the field is not written whatever the configuration asks for.
      */
-    public function testARecipientCarryingAKeyIsNamedAsAnObject(): void
+    public function testTheBodyAsksForNoResponseFormat(): void
     {
-        self::assertSame([
-            'rcpt' => ['r' => 421903622237, 'f' => self::IDENTIFIER],
-        ], $this->identifiedRequest()->getRecipientData());
+        $config = $this->config();
+        $config->setResponseFormat(ResponseFormatEnum::FULL);
+
+        $request = new RequestOne($config);
+        $request->setSenderName(self::SENDER);
+        $request->setRecipient(new Recipient(self::RECIPIENT));
+        $request->setContent(self::TEXT, new Flag);
+
+        self::assertArrayNotHasKey('rsp', $request->getData());
     }
 
-    public function testTheObjectOfAKeyedRecipientIsWhatTheBodyCarries(): void
+    /**
+     * The endpoint of a single message answers "rcpt" given as the object of chapter 9.2 with
+     * WRONG_NUMBER and "f" beside it with WRONG_KEY, so the one number is named bare, and a
+     * recipient carrying a key is refused before anything is sent rather than sent without it.
+     */
+    public function testARecipientCarryingAKeyIsNamedByItsNumberAlone(): void
     {
-        self::assertSame(
-            ['r' => 421903622237, 'f' => self::IDENTIFIER],
-            $this->identifiedRequest()->getData()['rcpt']
-        );
+        self::assertSame(['rcpt' => 421903622237], $this->identifiedRequest()->getRecipientData());
+    }
+
+    public function testTheBodyOfARecipientCarryingAKeyIsRefused(): void
+    {
+        $this->expectException(RequestException::class);
+        $this->expectExceptionCode(RequestInterface::ERROR_RECIPIENT_KEY_NOT_SUPPORTED);
+
+        $this->identifiedRequest()->getData();
+    }
+
+    /**
+     * A transaction writes the key out itself, beside the number of the entry, so the recipient
+     * is handed out whole.
+     */
+    public function testTheRecipientIsHandedOutWithItsKey(): void
+    {
+        $recipients = $this->identifiedRequest()->getRecipientList();
+
+        self::assertCount(1, $recipients);
+        self::assertSame(self::IDENTIFIER, $recipients[0]->getIdentifier());
     }
 
     /**
@@ -113,10 +143,7 @@ final class RequestOneTest extends TestCase
      */
     public function testTheKeyOfARecipientLeavesTheSignatureAlone(): void
     {
-        $request = $this->identifiedRequest();
-        $request->getData();
-
-        self::assertSame(self::SIGNATURE, $request->getSign());
+        self::assertSame(self::SIGNATURE, $this->identifiedRequest()->sign());
     }
 
     /**
@@ -520,6 +547,51 @@ final class RequestOneTest extends TestCase
         $instantMessage->setContent('Iny text');
 
         self::assertSame(self::VIBER_TEXT, $request->getData()['im']['msg']);
+    }
+
+    /**
+     * A message asking to go out over Viber signs the Viber text right after its own, chapter
+     * 9.2.2: the gateway answers the signature without it with WRONG_SIGNATURE.
+     * @param callable(Flag): void $ask
+     */
+    #[DataProvider('viberFlags')]
+    public function testAMessageAskingForViberSignsTheViberTextAfterItsOwn(callable $ask): void
+    {
+        $flag = new Flag;
+        $ask($flag);
+
+        $request = new RequestOne($this->config());
+        $request->setSenderName(self::SENDER);
+        $request->setRecipient(new Recipient(self::RECIPIENT));
+        $request->setContent(self::TEXT, $flag);
+        $request->setInstantMessage($this->instantMessage());
+
+        self::assertSame(self::TEXT . self::VIBER_TEXT, $request->getSignedText());
+        self::assertSame(self::VIBER_SIGNATURE, $request->getData()['sgn']);
+    }
+
+    /**
+     * @return array<string, array{callable(Flag): void}>
+     */
+    public static function viberFlags(): array
+    {
+        return [
+            'viber' => [static fn (Flag $flag) => $flag->addViber()],
+            'viber only' => [static fn (Flag $flag) => $flag->addViberOnly()],
+        ];
+    }
+
+    /**
+     * A variant that no flag asks for is no part of the message, and the gateway checks the
+     * signature of such a message without its text.
+     */
+    public function testAViberVariantNoFlagAsksForIsNotSigned(): void
+    {
+        $request = $this->request();
+        $request->setInstantMessage($this->instantMessage());
+
+        self::assertSame(self::TEXT, $request->getSignedText());
+        self::assertSame(self::SIGNATURE, $request->getData()['sgn']);
     }
 
     /**

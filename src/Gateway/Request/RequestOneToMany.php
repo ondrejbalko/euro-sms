@@ -6,6 +6,7 @@ namespace EuroSms\Gateway\Request;
 
 use DateTime;
 use EuroSms\Entities\Message\MessageInterface;
+use EuroSms\Entities\Recipient\Recipient;
 use EuroSms\Entities\Recipient\RecipientCollection;
 use EuroSms\Entities\Recipient\RecipientInterface;
 use EuroSms\Enums\FieldEnum;
@@ -128,6 +129,20 @@ class RequestOneToMany extends RequestMessageAbstract implements RequestInterfac
         }
 
         return [FieldEnum::RECIPIENTS->value => $this->getRecipientValues()];
+    }
+
+    /**
+     * @return list<Recipient>
+     * @throws RecipientException when the request was never given its recipients
+     */
+    #[\Override]
+    public function getRecipientList(): array
+    {
+        if (!isset($this->recipientCollection)) {
+            throw new RecipientException('Recipient not defined.', RecipientInterface::ERROR_RECIPIENT_NOT_DEFINED);
+        }
+
+        return array_values($this->recipientCollection->all());
     }
 
     /**

@@ -37,7 +37,7 @@ $context = [
     'method' => 'POST',
     'endpoint' => '/api/v3/send/one',
     'request' => '9f3a1c88-6d0e-4f2b-9a55-1b7c0d2e4a61',
-    'body' => ['iid' => '1-5U8J3C', 'rsp' => 'basic', 'sgn' => '***', 'rcpt' => 421903622237],
+    'body' => ['iid' => '1-5U8J3C', 'sgn' => '***', 'rcpt' => 421903622237],
 ];
 ```
 

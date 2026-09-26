@@ -50,6 +50,14 @@ interface RequestInterface extends JsonSerializable
     const int ERROR_DURATION_NOT_SPLITTABLE = 4;
 
     /**
+     * The recipient of a single message carries a key of its own, and the endpoint of a single
+     * message has nowhere to put one: it answers "rcpt" given as an object with WRONG_NUMBER and
+     * a key beside it with WRONG_KEY.
+     * @var int
+     */
+    const int ERROR_RECIPIENT_KEY_NOT_SUPPORTED = 5;
+
+    /**
      * @return array<string, mixed>
      */
     public function __toArray(): array;

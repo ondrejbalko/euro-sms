@@ -395,7 +395,6 @@ final class EuroSmsServiceTest extends TestCase
 
         self::assertSame([
             'iid' => '2-A2gHjk',
-            'rsp' => 'basic',
             'sgn' => '6f56060b6b7db97ca25782b771cca0a65077bd5b',
             'rcpt' => 421903622237,
             'sndr' => 'RZi',
@@ -507,9 +506,10 @@ final class EuroSmsServiceTest extends TestCase
     }
 
     /**
-     * What fills a transaction is how many messages it sends, not how many entries it lists:
-     * two entries of six hundred numbers each are twelve hundred messages and do not fit into
-     * one transaction.
+     * What fills a transaction is how many messages it sends, not how many messages were handed
+     * over: two messages of six hundred numbers each are twelve hundred messages and do not fit
+     * into one transaction. Each goes out as six hundred entries of one number, the only shape an
+     * entry of a transaction is accepted in.
      */
     public function testWhatFillsATransactionIsTheNumberOfMessagesNotOfEntries(): void
     {
@@ -534,8 +534,8 @@ final class EuroSmsServiceTest extends TestCase
         (void)$service->sendManyToMany($messageCollection);
 
         self::assertSame(2, $this->factory->requestCount());
-        self::assertCount(1, $this->factory->requestBody()['msgs']);
-        self::assertCount(1, $this->factory->requestBody(1)['msgs']);
+        self::assertCount(600, $this->factory->requestBody()['msgs']);
+        self::assertCount(600, $this->factory->requestBody(1)['msgs']);
     }
 
     /**
@@ -832,11 +832,11 @@ final class EuroSmsServiceTest extends TestCase
     }
 
     /**
-     * The Viber sender and the time to live of the first message that names any become the
-     * defaults of the whole transaction, the same way the default sender name is taken. The
-     * messages that name none carry no "im" object of their own.
+     * The gateway answers "dimsndr" and "dimttl" with WRONG_KEY, so the root carries no Viber
+     * defaults and the message naming a variant carries it whole. The messages that name none
+     * carry no "im" object of their own.
      */
-    public function testTheRootOfAGroupCarriesTheViberDefaultsOfTheFirstMessageThatNamesThem(): void
+    public function testTheRootOfAGroupCarriesNoViberDefaults(): void
     {
         $service = $this->service([MockClientFactory::json(self::RESPONSE_MANY_ACCEPTED)]);
 
@@ -853,8 +853,8 @@ final class EuroSmsServiceTest extends TestCase
 
         $body = $this->factory->requestBody();
 
-        self::assertSame('RZi Viber', $body['dimsndr']);
-        self::assertSame(600, $body['dimttl']);
+        self::assertArrayNotHasKey('dimsndr', $body);
+        self::assertArrayNotHasKey('dimttl', $body);
         self::assertSame([
             'sndr' => 'RZi Viber',
             'ttl' => 600,

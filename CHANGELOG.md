@@ -2,9 +2,40 @@
 
 | Version | Released   | Description                                                                                                 |
 |---------|------------|-------------------------------------------------------------------------------------------------------------|
+| 2.0.1   | unreleased | A single message sent without "rsp" and with a bare number, a transaction written out one entry per recipient, the key of a recipient beside its number in a transaction and refused on a single message, the Viber text signed, the Viber defaults of a transaction written into every entry, the response format setting deprecated |
 | 2.0.0   | 2026-09-02 | Php 8.5, bitwise flags, m2m in one request, enums, TLS verify from config, delivery status, Viber, CallBack, send and delivery statuses as enums with descriptions, root request parameters (response format, spreading a send over time, transaction defaults), a key of one's own on a recipient, the numbers a partly accepted group send refused, the segment count of a concatenated message, a flags value that is several flags at once, a gateway layer built on composition instead of inheritance, one ancestor for every exception, a PSR-18 transport, TLS verification on by default, a message text of "0" no longer dropped, a transaction refusing a message it cannot carry whole, the alphabet of a message worked out from its text, segments counted in GSM 03.38 septets, a configuration without an integration refused, a request without a text refused, sender names and message texts checked before the send, an empty message collection refused, a text over the recommended four segments reported instead of stopped, a delivery report time read as documented, a PSR-3 logger the calls and the failures are written into with the key and the signature masked out, the debug mode gone, a send exception carrying the status and the body of the answer that refused the call, a recipient read into E.164, a transaction with no message identifier to hand out, a refusal that lists nothing still reported with its reason, a message of a transaction refused when it names no sender or a duration another message contradicts, the numbers of a refused group request named, the batches of one send posted at the same time with the concurrency configurable, one failed batch no longer stopping the rest, a batch that never went out denied with the reason beside every number, the refusal of a batch readable where nothing was thrown, every log record naming the batch it is about, a numeric short code sent as the text sender it is, a refused number reported once, an accepted transaction failing nothing, a partly accepted answer read as the sent one it is, whatever the transport itself throws still a send exception, an unreadable body failing its own batch alone, a recipient told apart by its key as well as its number, a bulk status call repeatable under its transaction number, an empty id or key refused where it is set, a duration refused where it cannot be honoured, each transaction of a split collection carrying its own defaults, a failed send thrown as its first batch, every result reporting a number as its digits, a logged body masked from the array it was composed as, a message that signs itself without building its own request, a flag set that reading does not change |
 | 1.1.0   | 2024-05-22 | Update dependencies and allow php 8.4 install                                                               |
 | 1.0.0   | 2024-03-15 | Initial commit with basic functions                                                                         |
+
+## 2.0.1 — the request bodies the gateway actually accepts
+
+Checked against the test endpoints of the gateway, five bodies of 2.0.0 were refused, and one of
+them silently.
+
+* **A single message no longer sends `rsp`.** `POST /api/v3/send/one` answers the field with
+  `WRONG_KEY`, whatever value it carries, so every `sendOne()` failed. It is never written now.
+* **A single message refuses a recipient carrying a key.** The endpoint answers `rcpt` given as the
+  object `{"r": …, "f": …}` with `WRONG_NUMBER`, and `f` beside it with `WRONG_KEY`. `sendOne()` now
+  throws `RequestException` with `RequestInterface::ERROR_RECIPIENT_KEY_NOT_SUPPORTED` before
+  anything is sent. A caller that needs the key back on the delivery report sends the message with
+  `sendOneToMany()`, whose list takes the object.
+* **A transaction writes every recipient as an entry of its own.** An entry naming `rcpts` was
+  answered with `NO_RCPT` inside an answer whose code still read `ENQUEUED`, so every message of a
+  `sendManyToMany()` addressed through a recipient collection was dropped without a failure being
+  reported. An entry carries one number under `rcpt` now, signed over that number alone; a message
+  handed over for several recipients becomes several entries with the same text.
+* **The key of a recipient of a transaction travels as `f` beside `rcpt`.** The object of chapter
+  9.2 under `rcpt` is answered with `ERR_OTHER` there.
+* **A message asking for Viber signs the Viber text too.** With `addViber()` or `addViberOnly()` the
+  signature is composed over the text of the message followed by the text of its variant; without
+  it the gateway answered `WRONG_SIGNATURE` and no Viber message went out through any send.
+  `RequestMessageAbstract::getSignedText()` returns what the signature closes with.
+* **A transaction no longer writes `dimsndr` and `dimttl`.** The gateway answers both with
+  `WRONG_KEY`. The Viber defaults of a transaction complete the `im` of every entry instead.
+* **`Config::setResponseFormat()` is deprecated.** A group send asks for the full answer anyway and
+  a single message may not ask at all, so it no longer changes any request.
+* **`RequestMessageAbstract::getRecipientList()`** is new and abstract: the recipients of a message
+  request, keys and all. A class of your own extending it has to implement it.
 
 ## 2.0.0 — incompatible changes
 

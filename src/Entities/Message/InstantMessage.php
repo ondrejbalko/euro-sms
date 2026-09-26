@@ -11,8 +11,9 @@ use EuroSms\Gateway\GatewayInterface;
 /**
  * The Viber variant of a message, the "im" object of chapter 10 of SMS API v3.1.15. It carries a
  * sender registered with Viber, a text of its own and a time to live of its own. What it does not
- * carry falls back to the "dimsndr" and "dimttl" defaults of the whole transaction, so a message
- * that only differs in its text needs nothing else.
+ * carry is completed from the Viber defaults of the whole transaction, written into its own "im"
+ * because the root of a transaction carries none, so a message that only differs in its text
+ * needs nothing else.
  *
  * Chapter 10.2.1 lets the object be left out altogether but never sent empty, which is what
  * isEmpty() is asked before it is written into a request.

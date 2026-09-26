@@ -62,19 +62,13 @@ once the two credentials are filled in.
 
 ## How much of an answer to ask for
 
-The `rsp` parameter of chapter 9.2.1 decides how much the gateway writes back: `BASIC` is the tally
-alone, `FULL` writes every number out on its own. The gateway falls back to the basic answer, so
-the library does the same.
+There is nothing to configure. The `rsp` parameter of chapter 9.2.1 decides how much the gateway
+writes back, and the library states it itself: `sendOneToMany()` and `sendManyToMany()` ask for the
+full answer, because their results are read number by number out of the `accepted`,
+`wrong_numbers` and `result` lists, and `sendOne()` asks for nothing, because its endpoint answers
+`rsp` with `WRONG_KEY`.
 
-```php
-use EuroSms\Enums\ResponseFormatEnum;
-
-$config->setResponseFormat(ResponseFormatEnum::FULL);
-```
-
-`sendOneToMany()` and `sendManyToMany()` ask for the full answer whatever is configured — their
-results are read number by number out of the `accepted`, `wrong_numbers` and `result` lists, which
-the basic answer does not carry at all. The setting decides what `sendOne()` asks for.
+`Config::setResponseFormat()` is deprecated since `2.0.1` and changes no request.
 
 ## The transport
 

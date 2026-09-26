@@ -53,8 +53,7 @@ new Recipient('+420601000000');       // +420601000000, the same number, no coun
 
 ## A key of your own
 
-A recipient can carry the key the calling system knows it by, chapter 9.2. Given one, it travels as
-the object `{"r": 421903622237, "f": "…"}` rather than as a bare number, and the gateway repeats
+A recipient can carry the key the calling system knows it by, chapter 9.2, and the gateway repeats
 that key on every delivery report it sends back. Without it a receipt can only be matched by phone
 number, and two messages written to the same number in a row — an order confirmation and the
 verification code behind it — cannot be told apart at all.
@@ -74,6 +73,19 @@ The key is whatever the calling system files its records under and it is sent un
 one is read as no key at all. It changes nothing else about the send: the signature is composed of
 the phone numbers, chapter 9.2.2, so a message carrying keys is signed exactly as it was without
 them, and everything a send is reported back by stays the plain number.
+
+How the key travels depends on the send, and one of the three has nowhere to put it:
+
+| Send               | The key travels as                                        |
+|--------------------|-----------------------------------------------------------|
+| `sendOneToMany()`  | the object `{"r": 421903622237, "f": "…"}` in `rcpts`     |
+| `sendManyToMany()` | `"f": "…"` beside the `rcpt` of the entry                 |
+| `sendOne()`        | refused, `RequestException`                               |
+
+**A single message cannot carry a key.** Its endpoint answers `rcpt` given as the object with
+`WRONG_NUMBER` and `f` beside it with `WRONG_KEY`, so `sendOne()` refuses a recipient carrying one
+with `RequestInterface::ERROR_RECIPIENT_KEY_NOT_SUPPORTED` before anything is sent. A message whose
+receipt has to be matched by a key goes out through `sendOneToMany()` with a list of one.
 
 Where the key comes back is in [Delivery status](delivery-status.md), as
 `DeliveryReport::getIdentifier()`.
